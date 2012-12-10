@@ -6,6 +6,9 @@ daemon off;
 <% if node['nginx']['worker_rlimit_nofile'] -%>
 worker_rlimit_nofile <%= node['nginx']['worker_rlimit_nofile'] %>;
 <% end -%>
+<% if node.nginx.source.modules.include?('syslog_module') -%>
+syslog <%= node.nginx.syslog.facility || "local6" %> <%= node.nginx.syslog.name || "nginx" %>;
+<% end -%>
 
 error_log  <%= node['nginx']['log_dir'] %>/error.log;
 pid        <%= node['nginx']['pid'] %>;
@@ -32,13 +35,22 @@ http {
   access_log	<%= node['nginx']['log_dir'] %>/access.log;
   <% end %>
 
+  ##
+  # Basic Settings
+  ##
+
   sendfile on;
   tcp_nopush on;
   tcp_nodelay on;
+  server_tokens off;
 
   <% if node['nginx']['keepalive'] == "on" %>
-  keepalive_timeout  <%= node['nginx']['keepalive_timeout'] %>;
+  keepalive_timeout <%= node['nginx']['keepalive_timeout'] %>;
   <% end %>
+
+  ##
+  # Gzip Settings
+  ##
 
   gzip  <%= node['nginx']['gzip'] %>;
   <% if node['nginx']['gzip'] == "on" %>
@@ -53,6 +65,54 @@ http {
   server_names_hash_bucket_size <%= node['nginx']['server_names_hash_bucket_size'] %>;
   types_hash_max_size <%= node['nginx']['types_hash_max_size'] %>;
   types_hash_bucket_size <%= node['nginx']['types_hash_bucket_size'] %>;
+
+  # http://matt.io/technobabble/hivemind_devops_alert:_nginx_does_not_suck_at_ssl/ur
+  # http://news.ycombinator.com/item?id=2759596
+  # You can force nginx to not enable the expensive cipher by excluding all DHE ciphers.
+  # Add "!kEDH" to your cipher list. It disables (the ! disables) any cipher using
+  # Ephemeral Diffie-Hellman.
+  ssl_protocols             SSLv3 TLSv1;
+  ssl_ciphers               HIGH:!ADH:!MD5:!kEDH;
+  ssl_prefer_server_ciphers on;
+  ssl_session_timeout       10m;
+  ssl_session_cache         shared:SSL:10m;
+
+  proxy_set_header  Host              $host;
+  proxy_set_header  X-Real-IP         $remote_addr;
+  proxy_set_header  X-Forwarded-For   $proxy_add_x_forwarded_for;
+  proxy_set_header  X-Forwarded-Proto $scheme;
+
+  client_max_body_size    10m;
+  client_body_buffer_size 128k;
+
+  proxy_buffering on;
+  proxy_connect_timeout 60;
+  proxy_read_timeout 122;
+  proxy_next_upstream error timeout http_502;
+  proxy_intercept_errors on;
+
+  # proxy_buffers
+  # syntax: proxy_buffers the_number is_size;
+  # default: proxy_buffers 8 4k/8k;
+  # context: http, server, location
+  # This directive sets the number and the size of buffers, into which will be read the answer, obtained from the proxied server.
+  # By default, the size of one buffer is equal to the size of page. Depending on platform this is either 4K or 8K.
+
+  proxy_buffers   16 32k;
+
+  # proxy_buffer_size
+  # syntax: proxy_buffer_size the_size;
+  # default: proxy_buffer_size 4k/8k;
+  # context: http, server, location
+  # This directive set the buffer size, into which will be read the first part of the response, obtained from the proxied server.
+  # In this part of response the small response-header is located, as a rule.
+  # By default, the buffer size is equal to the size of one buffer in directive proxy_buffers; however, it is possible to set it to less.
+
+  # proxy_busy_buffers_size
+  # syntax: proxy_busy_buffers_size size;
+  # default: proxy_busy_buffers_size proxy_buffer_size * 2;
+  # context: http, server, location, if
+  # TODO: Description.
 
   include <%= node['nginx']['dir'] %>/conf.d/*.conf;
   include <%= node['nginx']['dir'] %>/sites-enabled/*;
