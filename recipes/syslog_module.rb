@@ -21,15 +21,9 @@
 
 nginx_src_filepath  = "#{Chef::Config['file_cache_path'] || '/tmp'}/nginx-#{node['nginx']['version']}.tar.gz"
 
-syslog_src_filename = ::File.basename(node['nginx']['syslog']['url'])
+syslog_src_filename = "syslog-"+::File.basename(node['nginx']['syslog']['url'])
 syslog_src_filepath = "#{Chef::Config['file_cache_path']}/#{syslog_src_filename}"
 syslog_extract_path = "#{Chef::Config['file_cache_path']}/nginx_syslog"
-
-Chef::Log.info("nginx_src_filepath = '#{nginx_src_filepath}'")
-
-Chef::Log.info("syslog_src_filename = '#{syslog_src_filename}'")
-Chef::Log.info("syslog_src_filepath = '#{syslog_src_filepath}'")
-Chef::Log.info("syslog_extract_path = '#{syslog_extract_path}'")
 
 remote_file syslog_src_filepath do
   source node['nginx']['syslog']['url']

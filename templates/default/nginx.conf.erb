@@ -1,17 +1,17 @@
-user <%= node['nginx']['user'] %><% if node['nginx']['user'] != node['nginx']['group'] %> <%= node['nginx']['group'] %><% end %>;
-worker_processes  <%= node['nginx']['worker_processes'] %>;
-<% if node['nginx']['daemon_disable'] -%>
+user <%= node.nginx.user %><% if node.nginx.user != node.nginx.group -%> <%= node.nginx.group %><% end -%>;
+worker_processes  <%= node.nginx.worker_processes %>;
+<% if node.nginx.daemon_disable -%>
 daemon off;
 <% end -%>
-<% if node['nginx']['worker_rlimit_nofile'] -%>
-worker_rlimit_nofile <%= node['nginx']['worker_rlimit_nofile'] %>;
+<% if node.nginx.worker_rlimit_nofile -%>
+worker_rlimit_nofile <%= node.nginx.worker_rlimit_nofile %>;
 <% end -%>
 <% if node.nginx.source.modules.include?('syslog_module') -%>
 syslog <%= node.nginx.syslog.facility || "local6" %> <%= node.nginx.syslog.name || "nginx" %>;
 <% end -%>
 
-error_log  <%= node['nginx']['log_dir'] %>/error.log;
-pid        <%= node['nginx']['pid'] %>;
+error_log <%= "syslog:info|" if node.recipe?('nginx::syslog_module') %><%= node.nginx.log_dir %>/error.log;
+pid       <%= node.nginx.pid %>;
 
 events {
   worker_connections  <%= node['nginx']['worker_connections'] %>;
@@ -24,17 +24,29 @@ events {
 }
 
 http {
-  <% if node.recipe?('nginx::naxsi_module') %>
+<% if node.recipe?('nginx::naxsi_module') -%>
   include       <%= node['nginx']['dir'] %>/naxsi_core.rules;
-  <% end %>
+<% end -%>
 
   include       <%= node['nginx']['dir'] %>/mime.types;
   default_type  application/octet-stream;
 
-  <% unless node['nginx']['disable_access_log'] -%>
-  access_log	<%= node['nginx']['log_dir'] %>/access.log;
-  <% end %>
+  ##
+  # Logging
+  ##
 
+<% if node.recipe?('nginx::xrid_module') -%>
+  log_format main  '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for" - $connection $request_time $upstream_cache_status $request_id';
+  log_format timing '$remote_addr - $remote_user [$time_local] $scheme $request $status upstream_response_time $upstream_response_time msec $msec request_time $request_time request_id $request_id';
+<% else -%>
+  log_format main  '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for" - $connection $request_time $upstream_cache_status';
+  log_format timing '$remote_addr - $remote_user [$time_local] $scheme $request $status upstream_response_time $upstream_response_time msec $msec request_time $request_time';
+<% end -%>
+
+<% unless node.nginx.disable_access_log -%>
+  access_log <%= "syslog:info|" if node.recipe?('nginx::syslog_module') %><%= node.nginx.log_dir %>/access.log;
+
+<% end -%>
   ##
   # Basic Settings
   ##
@@ -77,10 +89,13 @@ http {
   ssl_session_timeout       10m;
   ssl_session_cache         shared:SSL:10m;
 
-  proxy_set_header  Host              $host;
-  proxy_set_header  X-Real-IP         $remote_addr;
-  proxy_set_header  X-Forwarded-For   $proxy_add_x_forwarded_for;
-  proxy_set_header  X-Forwarded-Proto $scheme;
+  proxy_set_header Host              $host;
+  proxy_set_header X-Real-IP         $remote_addr;
+  proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+<% if node.recipe?('nginx::xrid_module') -%>
+  proxy_set_header X-Request-Id      $request_id;
+<% end -%>
 
   client_max_body_size    10m;
   client_body_buffer_size 128k;
