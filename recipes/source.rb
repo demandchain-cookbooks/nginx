@@ -68,7 +68,7 @@ user node['nginx']['user'] do
   home "/var/www"
 end
 
-node.run_state['nginx_force_recompile'] = true
+node.run_state['nginx_force_recompile'] = false
 node.run_state['nginx_configure_flags'] =
   node['nginx']['source']['default_configure_flags'] | node['nginx']['configure_flags']
 
