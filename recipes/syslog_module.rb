@@ -40,10 +40,15 @@ bash "syslog_module" do
     tar xzf #{syslog_src_filename} -C #{syslog_extract_path}
     mv -f #{syslog_extract_path}/*/* #{syslog_extract_path}/
     cd #{::File.dirname(nginx_src_filepath)}/nginx-#{node['nginx']['version']}
-    patch -p1 < #{syslog_extract_path}/syslog_#{node['nginx']['version']}.patch
   EOH
 
   not_if { ::File.exists?(syslog_extract_path) }
+end
+
+execute "patch nginx" do
+  cwd "#{::File.dirname(nginx_src_filepath)}/nginx-#{node['nginx']['version']}"
+  returns [ 0 ]
+  command "patch -p1 < #{syslog_extract_path}/syslog_#{node['nginx']['version']}.patch"
 end
 
 node.run_state['nginx_configure_flags'] =
