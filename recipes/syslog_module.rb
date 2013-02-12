@@ -47,7 +47,7 @@ end
 
 execute "patch nginx" do
   cwd "#{::File.dirname(nginx_src_filepath)}/nginx-#{node['nginx']['version']}"
-  returns [ 0 ]
+  returns [0, 1]
   command "patch -p1 < #{syslog_extract_path}/syslog_#{node['nginx']['version']}.patch"
 end
 
